@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Twin-Key Vault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --graphite-900:#14161a;
+    --graphite-800:#1c1f24;
+    --graphite-700:#262a30;
+    --steel-600:#4a5058;
+    --steel-300:#9aa2ab;
+    --brass-500:#c99a4b;
+    --brass-300:#e8c98a;
+    --brass-glow: rgba(201,154,75,0.35);
+    --paper-100:#eeece6;
+    --alert-500:#d1594a;
+    --ok-500:#7a9e6e;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:
+      radial-gradient(ellipse at top, #1a1d22 0%, var(--graphite-900) 55%);
+    color:var(--paper-100);
+    font-family:'IBM Plex Sans', sans-serif;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:48px 24px 80px;
+  }
+  header{ text-align:center; margin-bottom:8px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--brass-500);
+    margin-bottom:10px;
+  }
+  h1{
+    font-family:'Zilla Slab', serif;
+    font-weight:700;
+    font-size:clamp(28px, 5vw, 40px);
+    margin:0 0 10px;
+    color:var(--paper-100);
+    letter-spacing:0.01em;
+  }
+  .sub{
+    color:var(--steel-300);
+    font-size:14.5px;
+    line-height:1.55;
+    max-width:480px;
+    margin:0 auto 36px;
+  }
+
+  /* ---- Dual dial signature element ---- */
+  .dials{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:0;
+    margin:0 auto 36px;
+    position:relative;
+    height:118px;
+  }
+  .dial-svg{ width:100px; height:100px; display:block; }
+  .dial-ring{ fill:none; stroke:var(--steel-600); stroke-width:3; transition:stroke 0.4s ease; }
+  .dial-tick{ fill:var(--steel-600); transition:fill 0.4s ease; }
+  .dial-needle{
+    stroke:var(--steel-300);
+    stroke-width:3;
+    stroke-linecap:round;
+    transform-origin:50px 50px;
+    transition: stroke 0.4s ease, transform 0.5s cubic-bezier(.4,1.4,.6,1);
+  }
+  .dial-hub{ fill:var(--graphite-700); stroke:var(--steel-600); stroke-width:2; transition:stroke 0.4s ease; }
+  .dial.lit .dial-ring{ stroke:var(--brass-500); }
+  .dial.lit .dial-tick{ fill:var(--brass-500); }
+  .dial.lit .dial-needle{ stroke:var(--brass-300); }
+  .dial.lit .dial-hub{ stroke:var(--brass-500); }
+
+  .bridge{
+    width:90px; height:6px;
+    background:var(--steel-600);
+    border-radius:3px;
+    position:relative;
+    z-index:-1;
+    margin:0 -8px;
+    transition:background 0.4s ease, box-shadow 0.4s ease;
+  }
+  .bridge.lit{ background:var(--brass-500); box-shadow:0 0 16px var(--brass-glow); }
+  .dials.busy .dial-needle{ animation: spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---- Panel ---- */
+  .panel{
+    background:var(--graphite-800);
+    border:1px solid var(--graphite-700);
+    border-radius:10px;
+    padding:28px;
+  }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:22px; }
+  .tab{
+    flex:1;
+    padding:11px 0;
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--steel-300);
+    background:var(--graphite-700);
+    border:1px solid var(--graphite-700);
+    border-radius:7px;
+    cursor:pointer;
+    user-select:none;
+    transition:all 0.2s ease;
+  }
+  .tab.active{
+    color:var(--graphite-900);
+    background:var(--brass-500);
+    border-color:var(--brass-500);
+  }
+
+  .field{ margin-bottom:18px; }
+  .field label{
+    display:block;
+    font-size:12.5px;
+    color:var(--steel-300);
+    margin-bottom:7px;
+    letter-spacing:0.02em;
+  }
+  .mode-toggle{ display:flex; gap:8px; margin-bottom:18px; }
+  .mode-btn{
+    flex:1;
+    padding:9px 0;
+    text-align:center;
+    font-size:13px;
+    color:var(--steel-300);
+    background:transparent;
+    border:1px solid var(--steel-600);
+    border-radius:7px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+  }
+  .mode-btn.active{
+    color:var(--brass-300);
+    border-color:var(--brass-500);
+    background:rgba(201,154,75,0.08);
+  }
+
+  textarea, input[type=text], input[type=password]{
+    width:100%;
+    background:var(--graphite-900);
+    border:1px solid var(--steel-600);
+    color:var(--paper-100);
+    border-radius:7px;
+    padding:11px 13px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    outline:none;
+    transition:border-color 0.2s ease;
+  }
+  textarea:focus, input:focus{ border-color:var(--brass-500); }
+  textarea{ min-height:90px; resize:vertical; line-height:1.5; }
+
+  .file-drop{
+    border:1.5px dashed var(--steel-600);
+    border-radius:8px;
+    padding:20px 14px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color 0.2s ease, background 0.2s ease;
+    font-size:13.5px;
+    color:var(--steel-300);
+  }
+  .file-drop:hover, .file-drop.drag{ border-color:var(--brass-500); background:rgba(201,154,75,0.05); }
+  .file-drop .fname{ color:var(--brass-300); font-family:'IBM Plex Mono', monospace; margin-top:6px; word-break:break-all; }
+  input[type=file]{ display:none; }
+
+  .code-row{ display:flex; gap:14px; }
+  .code-row .field{ flex:1; }
+  .pw-wrap{ position:relative; }
+  .pw-wrap input{ padding-right:38px; }
+  .pw-eye{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    cursor:pointer; color:var(--steel-300); font-size:15px; user-select:none;
+    background:none; border:none;
+  }
+
+  button.primary{
+    width:100%;
+    padding:13px 0;
+    margin-top:6px;
+    background:var(--brass-500);
+    color:var(--graphite-900);
+    border:none;
+    border-radius:8px;
+    font-weight:600;
+    font-size:14.5px;
+    font-family:'IBM Plex Sans', sans-serif;
+    cursor:pointer;
+    transition:background 0.2s ease, transform 0.1s ease;
+  }
+  button.primary:hover{ background:var(--brass-300); }
+  button.primary:active{ transform:scale(0.99); }
+  button.primary:disabled{ background:var(--steel-600); color:var(--steel-300); cursor:not-allowed; }
+
+  .msg{
+    margin-top:14px;
+    padding:11px 13px;
+    border-radius:7px;
+    font-size:13px;
+    line-height:1.5;
+    display:none;
+  }
+  .msg.show{ display:block; }
+  .msg.error{ background:rgba(209,89,74,0.12); color:#e8a49a; border:1px solid rgba(209,89,74,0.35); }
+  .msg.ok{ background:rgba(122,158,110,0.12); color:#b8d1ac; border:1px solid rgba(122,158,110,0.35); }
+
+  .result{ margin-top:18px; }
+  .result-box{
+    background:var(--graphite-900);
+    border:1px solid var(--steel-600);
+    border-radius:8px;
+    padding:13px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--brass-300);
+    word-break:break-all;
+    max-height:160px;
+    overflow-y:auto;
+    line-height:1.5;
+  }
+  .result-actions{ display:flex; gap:10px; margin-top:12px; }
+  .ghost-btn{
+    flex:1;
+    padding:10px 0;
+    background:transparent;
+    border:1px solid var(--steel-600);
+    color:var(--paper-100);
+    border-radius:7px;
+    font-size:13px;
+    cursor:pointer;
+    transition:border-color 0.2s ease, color 0.2s ease;
+  }
+  .ghost-btn:hover{ border-color:var(--brass-500); color:var(--brass-300); }
+
+  .footnote{
+    text-align:center;
+    color:var(--steel-600);
+    font-size:12px;
+    margin-top:26px;
+    line-height:1.6;
+  }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Client-side · two-key encryption</div>
+    <h1>Twin-Key Vault</h1>
+    <p class="sub">Locks a file or a message with two separate codes. Both are required to open it again — lose one, and it stays shut. Nothing ever leaves this page; all locking happens in your browser.</p>
+  </header>
+
+  <div class="dials" id="dials">
+    <svg class="dial-svg dial" id="dial1" viewBox="0 0 100 100">
+      <circle class="dial-ring" cx="50" cy="50" r="42"/>
+      <g id="ticks1"></g>
+      <line class="dial-needle" id="needle1" x1="50" y1="50" x2="50" y2="16"/>
+      <circle class="dial-hub" cx="50" cy="50" r="7"/>
+    </svg>
+    <div class="bridge" id="bridge"></div>
+    <svg class="dial-svg dial" id="dial2" viewBox="0 0 100 100">
+      <circle class="dial-ring" cx="50" cy="50" r="42"/>
+      <g id="ticks2"></g>
+      <line class="dial-needle" id="needle2" x1="50" y1="50" x2="50" y2="16"/>
+      <circle class="dial-hub" cx="50" cy="50" r="7"/>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab active" data-tab="lock">Lock</div>
+      <div class="tab" data-tab="unlock">Unlock</div>
+    </div>
+
+    <!-- LOCK -->
+    <div id="lock-panel">
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="file">File</button>
+        <button class="mode-btn" data-mode="text">Text</button>
+      </div>
+
+      <div class="field" id="lock-file-field">
+        <label>Choose a file</label>
+        <div class="file-drop" id="lock-drop">
+          <div>Click to choose, or drop a file here</div>
+          <div class="fname" id="lock-fname"></div>
+        </div>
+        <input type="file" id="lock-file-input">
+      </div>
+
+      <div class="field hidden" id="lock-text-field">
+        <label>Text to lock</label>
+        <textarea id="lock-text" placeholder="Type or paste whatever you want to lock..."></textarea>
+      </div>
+
+      <div class="code-row">
+        <div class="field">
+          <label>Code 1</label>
+          <div class="pw-wrap">
+            <input type="password" id="lock-code1" placeholder="First code">
+            <button class="pw-eye" data-target="lock-code1">show</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Code 2</label>
+          <div class="pw-wrap">
+            <input type="password" id="lock-code2" placeholder="Second code">
+            <button class="pw-eye" data-target="lock-code2">show</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="primary" id="lock-btn">Lock it</button>
+      <div class="msg" id="lock-msg"></div>
+
+      <div class="result hidden" id="lock-result">
+        <label style="display:block;font-size:12.5px;color:var(--steel-300);margin-bottom:7px;">Locked output</label>
+        <div class="result-box" id="lock-output"></div>
+        <div class="result-actions">
+          <button class="ghost-btn" id="lock-copy">Copy text</button>
+          <button class="ghost-btn" id="lock-download">Download as .txt</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UNLOCK -->
+    <div id="unlock-panel" class="hidden">
+      <div class="field">
+        <label>Paste the locked string</label>
+        <textarea id="unlock-input" placeholder="Paste the long locked string here..."></textarea>
+      </div>
+      <div class="field" style="margin-top:-6px;">
+        <div class="file-drop" id="unlock-drop" style="padding:12px 14px;">
+          <div>...or click to load it from a .txt file</div>
+          <div class="fname" id="unlock-fname"></div>
+        </div>
+        <input type="file" id="unlock-file-input" accept=".txt">
+      </div>
+
+      <div class="code-row">
+        <div class="field">
+          <label>Code 1</label>
+          <div class="pw-wrap">
+            <input type="password" id="unlock-code1" placeholder="First code">
+            <button class="pw-eye" data-target="unlock-code1">show</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Code 2</label>
+          <div class="pw-wrap">
+            <input type="password" id="unlock-code2" placeholder="Second code">
+            <button class="pw-eye" data-target="unlock-code2">show</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="primary" id="unlock-btn">Unlock it</button>
+      <div class="msg" id="unlock-msg"></div>
+
+      <div class="result hidden" id="unlock-result-file">
+        <label style="display:block;font-size:12.5px;color:var(--steel-300);margin-bottom:7px;">Restored file</label>
+        <div class="result-box" id="unlock-filename"></div>
+        <div class="result-actions">
+          <button class="ghost-btn" id="unlock-download-file">Download file</button>
+        </div>
+      </div>
+
+      <div class="result hidden" id="unlock-result-text">
+        <label style="display:block;font-size:12.5px;color:var(--steel-300);margin-bottom:7px;">Restored text</label>
+        <div class="result-box" id="unlock-output"></div>
+        <div class="result-actions">
+          <button class="ghost-btn" id="unlock-copy">Copy text</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">Format v1 · PBKDF2-SHA256 (300,000 rounds) → AES-256-GCM · salt + IV are unique per lock<br>Both codes are required to unlock. There is no recovery if either is lost.</p>
+</div>
+
+<script>
+(function(){
+  const ITER = 300000;
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  // ---------- base64 helpers ----------
+  function toB64(bytes){
+    let binary = "";
+    const chunk = 0x8000;
+    for(let i=0;i<bytes.length;i+=chunk){
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+    }
+    return btoa(binary);
+  }
+  function fromB64(str){
+    const binary = atob(str);
+    const bytes = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  // ---------- crypto core ----------
+  async function deriveKey(code1, code2, salt){
+    const material = await crypto.subtle.importKey(
+      "raw", enc.encode(code1 + "\u0000" + code2), "PBKDF2", false, ["deriveKey"]
+    );
+    return crypto.subtle.deriveKey(
+      { name:"PBKDF2", salt, iterations:ITER, hash:"SHA-256" },
+      material,
+      { name:"AES-GCM", length:256 },
+      false,
+      ["encrypt","decrypt"]
+    );
+  }
+
+  async function encryptPayload(payloadObj, code1, code2){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(code1, code2, salt);
+    const plaintext = enc.encode(JSON.stringify(payloadObj));
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, plaintext));
+    return `v1:${toB64(salt)}:${toB64(iv)}:${toB64(ciphertext)}`;
+  }
+
+  async function decryptBlob(blob, code1, code2){
+    const parts = blob.trim().split(":");
+    if(parts.length !== 4 || parts[0] !== "v1"){
+      throw new Error("That doesn't look like a valid locked string.");
+    }
+    const [, saltB64, ivB64, ctB64] = parts;
+    const salt = fromB64(saltB64);
+    const iv = fromB64(ivB64);
+    const ct = fromB64(ctB64);
+    const key = await deriveKey(code1, code2, salt);
+    let plainBuf;
+    try{
+      plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
+    }catch(e){
+      throw new Error("Wrong codes, or the locked string was altered.");
+    }
+    return JSON.parse(dec.decode(plainBuf));
+  }
+
+  function fileToArrayBuffer(file){
+    return new Promise((resolve, reject)=>{
+      const r = new FileReader();
+      r.onload = ()=> resolve(r.result);
+      r.onerror = ()=> reject(r.error);
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  // ---------- dial visuals ----------
+  function buildTicks(groupId){
+    const g = document.getElementById(groupId);
+    for(let i=0;i<24;i++){
+      const angle = (i/24)*360;
+      const rad = angle * Math.PI/180;
+      const r1=42, r2 = i%6===0 ? 34 : 37;
+      const x1 = 50 + r1*Math.sin(rad), y1 = 50 - r1*Math.cos(rad);
+      const x2 = 50 + r2*Math.sin(rad), y2 = 50 - r2*Math.cos(rad);
+      const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1",x1); line.setAttribute("y1",y1);
+      line.setAttribute("x2",x2); line.setAttribute("y2",y2);
+      line.setAttribute("class","dial-tick");
+      line.setAttribute("stroke", i%6===0 ? "var(--steel-600)" : "none");
+      line.setAttribute("stroke-width","2");
+      g.appendChild(line);
+    }
+  }
+  buildTicks("ticks1"); buildTicks("ticks2");
+
+  function hashRotate(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) % 360; }
+    return h;
+  }
+
+  function wireDial(inputEl, dialEl, needleEl){
+    inputEl.addEventListener("input", ()=>{
+      const val = inputEl.value;
+      const lit = val.length > 0;
+      dialEl.classList.toggle("lit", lit);
+      needleEl.style.transform = `rotate(${lit ? hashRotate(val) : 0}deg)`;
+      updateBridge();
+    });
+  }
+
+  function updateBridge(){
+    const bridge = document.getElementById("bridge");
+    const lit1 = document.getElementById("dial1").classList.contains("lit");
+    const lit2 = document.getElementById("dial2").classList.contains("lit");
+    bridge.classList.toggle("lit", lit1 && lit2);
+  }
+
+  function setBusy(on){
+    document.getElementById("dials").classList.toggle("busy", on);
+  }
+
+  // ---------- tabs ----------
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach(t=>{
+    t.addEventListener("click", ()=>{
+      tabs.forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      const isLock = t.dataset.tab === "lock";
+      document.getElementById("lock-panel").classList.toggle("hidden", !isLock);
+      document.getElementById("unlock-panel").classList.toggle("hidden", isLock);
+      // rewire dials to whichever panel is visible
+      rewireDials(isLock ? "lock" : "unlock");
+    });
+  });
+
+  function rewireDials(prefix){
+    const c1 = document.getElementById(prefix+"-code1");
+    const c2 = document.getElementById(prefix+"-code2");
+    const d1 = document.getElementById("dial1"), n1 = document.getElementById("needle1");
+    const d2 = document.getElementById("dial2"), n2 = document.getElementById("needle2");
+    d1.classList.toggle("lit", c1.value.length>0);
+    n1.style.transform = c1.value.length>0 ? `rotate(${hashRotate(c1.value)}deg)` : "rotate(0deg)";
+    d2.classList.toggle("lit", c2.value.length>0);
+    n2.style.transform = c2.value.length>0 ? `rotate(${hashRotate(c2.value)}deg)` : "rotate(0deg)";
+    updateBridge();
+    wireDial(c1, d1, n1);
+    wireDial(c2, d2, n2);
+  }
+  rewireDials("lock");
+
+  // ---------- show/hide password ----------
+  document.querySelectorAll(".pw-eye").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const target = document.getElementById(btn.dataset.target);
+      const showing = target.type === "text";
+      target.type = showing ? "password" : "text";
+      btn.textContent = showing ? "show" : "hide";
+    });
+  });
+
+  // ---------- lock mode toggle (file/text) ----------
+  document.querySelectorAll(".mode-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".mode-btn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const isFile = btn.dataset.mode === "file";
+      document.getElementById("lock-file-field").classList.toggle("hidden", !isFile);
+      document.getElementById("lock-text-field").classList.toggle("hidden", isFile);
+    });
+  });
+
+  // ---------- file drop / pick (lock) ----------
+  let lockFile = null;
+  const lockDrop = document.getElementById("lock-drop");
+  const lockFileInput = document.getElementById("lock-file-input");
+  lockDrop.addEventListener("click", ()=> lockFileInput.click());
+  lockFileInput.addEventListener("change", ()=>{
+    lockFile = lockFileInput.files[0] || null;
+    document.getElementById("lock-fname").textContent = lockFile ? lockFile.name : "";
+  });
+  ["dragover","dragleave","drop"].forEach(evt=>{
+    lockDrop.addEventListener(evt, (e)=>{
+      e.preventDefault();
+      lockDrop.classList.toggle("drag", evt==="dragover");
+      if(evt==="drop" && e.dataTransfer.files[0]){
+        lockFile = e.dataTransfer.files[0];
+        document.getElementById("lock-fname").textContent = lockFile.name;
+      }
+    });
+  });
+
+  // ---------- file drop / pick (unlock, loads a .txt containing the blob) ----------
+  const unlockDrop = document.getElementById("unlock-drop");
+  const unlockFileInput = document.getElementById("unlock-file-input");
+  unlockDrop.addEventListener("click", ()=> unlockFileInput.click());
+  unlockFileInput.addEventListener("change", async ()=>{
+    const f = unlockFileInput.files[0];
+    if(!f) return;
+    document.getElementById("unlock-fname").textContent = f.name;
+    const text = await f.text();
+    document.getElementById("unlock-input").value = text.trim();
+  });
+
+  function showMsg(id, text, kind){
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = "msg show " + kind;
+  }
+  function clearMsg(id){
+    const el = document.getElementById(id);
+    el.className = "msg";
+  }
+
+  // ---------- LOCK action ----------
+  document.getElementById("lock-btn").addEventListener("click", async ()=>{
+    clearMsg("lock-msg");
+    document.getElementById("lock-result").classList.add("hidden");
+    const mode = document.querySelector(".mode-btn.active").dataset.mode;
+    const code1 = document.getElementById("lock-code1").value;
+    const code2 = document.getElementById("lock-code2").value;
+
+    if(!code1 || !code2){
+      showMsg("lock-msg","Both codes are required.","error"); return;
+    }
+    let payload;
+    try{
+      if(mode === "file"){
+        if(!lockFile){ showMsg("lock-msg","Choose a file first.","error"); return; }
+        const buf = await fileToArrayBuffer(lockFile);
+        payload = {
+          type:"file",
+          name: lockFile.name,
+          mime: lockFile.type || "application/octet-stream",
+          data: toB64(new Uint8Array(buf))
+        };
+      } else {
+        const text = document.getElementById("lock-text").value;
+        if(!text){ showMsg("lock-msg","Type something to lock first.","error"); return; }
+        payload = { type:"string", name:"", mime:"", data: toB64(enc.encode(text)) };
+      }
+
+      setBusy(true);
+      const blob = await encryptPayload(payload, code1, code2);
+      setBusy(false);
+
+      document.getElementById("lock-output").textContent = blob;
+      document.getElementById("lock-result").classList.remove("hidden");
+      showMsg("lock-msg","Locked successfully.","ok");
+      window._lastLockBlob = blob;
+    }catch(e){
+      setBusy(false);
+      showMsg("lock-msg", "Something went wrong: " + e.message, "error");
+    }
+  });
+
+  async function copyText(text, btn){
+    const original = btn.textContent;
+    try{
+      await navigator.clipboard.writeText(text);
+    }catch(e){
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    btn.textContent = "Copied!";
+    setTimeout(()=> btn.textContent = original, 1400);
+  }
+
+  document.getElementById("lock-copy").addEventListener("click", (e)=>{
+    if(window._lastLockBlob) copyText(window._lastLockBlob, e.target);
+  });
+  document.getElementById("lock-download").addEventListener("click", ()=>{
+    if(!window._lastLockBlob) return;
+    const blob = new Blob([window._lastLockBlob], {type:"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "locked.txt";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------- UNLOCK action ----------
+  let restoredFileBlob = null, restoredFileName = "";
+
+  document.getElementById("unlock-btn").addEventListener("click", async ()=>{
+    clearMsg("unlock-msg");
+    document.getElementById("unlock-result-file").classList.add("hidden");
+    document.getElementById("unlock-result-text").classList.add("hidden");
+
+    const blob = document.getElementById("unlock-input").value.trim();
+    const code1 = document.getElementById("unlock-code1").value;
+    const code2 = document.getElementById("unlock-code2").value;
+
+    if(!blob){ showMsg("unlock-msg","Paste a locked string or load a .txt file first.","error"); return; }
+    if(!code1 || !code2){ showMsg("unlock-msg","Both codes are required.","error"); return; }
+
+    try{
+      setBusy(true);
+      const payload = await decryptBlob(blob, code1, code2);
+      setBusy(false);
+
+      const rawBytes = fromB64(payload.data);
+      if(payload.type === "file"){
+        restoredFileBlob = new Blob([rawBytes], {type: payload.mime || "application/octet-stream"});
+        restoredFileName = payload.name || "restored_file";
+        document.getElementById("unlock-filename").textContent = restoredFileName;
+        document.getElementById("unlock-result-file").classList.remove("hidden");
+      } else {
+        const text = dec.decode(rawBytes);
+        document.getElementById("unlock-output").textContent = text;
+        document.getElementById("unlock-result-text").classList.remove("hidden");
+        window._lastUnlockText = text;
+      }
+      showMsg("unlock-msg","Unlocked successfully.","ok");
+    }catch(e){
+      setBusy(false);
+      showMsg("unlock-msg", e.message || "Failed to unlock.", "error");
+    }
+  });
+
+  document.getElementById("unlock-download-file").addEventListener("click", ()=>{
+    if(!restoredFileBlob) return;
+    const url = URL.createObjectURL(restoredFileBlob);
+    const a = document.createElement("a");
+    a.href = url; a.download = restoredFileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById("unlock-copy").addEventListener("click", (e)=>{
+    if(window._lastUnlockText) copyText(window._lastUnlockText, e.target);
+  });
+
+})();
+</script>
+</body>
+</html>
